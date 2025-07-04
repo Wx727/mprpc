@@ -2,7 +2,7 @@ syntax = "proto3"; // 声明版本
 
 package mprpc; // 声明代码所在的包（对 C++ 来说是 namespace）
 
-// option cc_generic_services = true; // 表示生成 service 服务类和 rpc 方法描述，默认不开启
+option cc_generic_services = true; // 表示生成 service 服务类和 rpc 方法描述，默认不开启
 
 message LoginRequest {
     bytes name = 1;
