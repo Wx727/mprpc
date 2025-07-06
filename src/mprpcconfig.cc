@@ -5,12 +5,12 @@ void Trim(std::string& src_buf) {
     // 去掉字符串前面多余的空格
     int idx = src_buf.find_first_not_of(' ');
     if (idx != -1) {
-        src_buf = src_buf.substr(idx, src_buf.size() - idx);
+        src_buf = src_buf.substr(idx);
     }
     // 去掉字符串后面多余的空格
     idx = src_buf.find_last_not_of(' ');
     if (idx != -1) {
-        src_buf = src_buf.substr(0);
+        src_buf = src_buf.substr(0, idx + 1);
     }
 }
 
