@@ -1,6 +1,7 @@
 #include "mprpcchannel.h"
 #include "rpcheader.pb.h"
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <muduo/net/InetAddress.h>
 #include <netinet/in.h>
@@ -29,7 +30,8 @@ void MprpChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
     if (request->SerializeToString(&args_str)) {
         args_size = args_str.size();
     } else {
-        std::cout << "serialize request error" << std::endl;
+        // std::cout << "serialize request error" << std::endl;
+        controller->SetFailed("serialize request error");
         return;
     }
 
@@ -44,7 +46,8 @@ void MprpChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
     if (rpcheader.SerializeToString(&rpc_header_str)) {
         header_size = rpc_header_str.size();
     } else {
-        std::cout << "serialize rpc header error" << std::endl;
+        // std::cout << "serialize rpc header error" << std::endl;
+        controller->SetFailed("serialize rpc header error");
         return;
     }
 
@@ -66,8 +69,13 @@ void MprpChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
     // 使用tcp编程，完成rpc方法的远程调用
     int clientfd = socket(AF_INET, SOCK_STREAM, 0);
     if (clientfd == -1) {
-        std::cout << "create socket error, errno: " << errno << std::endl;
-        exit(EXIT_FAILURE);
+        // std::cout << "create socket error, errno: " << errno << std::endl;
+        // exit(EXIT_FAILURE);
+
+        char errText[512] = {0};
+        sprintf(errText, "create socket error, errno: %d", errno);
+        controller->SetFailed(errText);
+        return;
     }
 
     // 读取配置文件rpcserver的信息
@@ -82,15 +90,21 @@ void MprpChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
 
     // 连接rpc服务节点
     if (connect(clientfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
-        std::cout << "connet error, errno: " << errno << std::endl;
+        // std::cout << "connet error, errno: " << errno << std::endl;
         close(clientfd);
-        exit(EXIT_FAILURE);
+        char errText[512] = {0};
+        sprintf(errText, "connet error, errno: %d", errno);
+        controller->SetFailed(errText);
+        return;
     }
 
     // 发送rpc请求
     if (send(clientfd, send_rpc_str.c_str(), send_rpc_str.size(), 0) == -1) {
-        std::cout << "send error, errno: " << errno << std::endl;
+        // std::cout << "send error, errno: " << errno << std::endl;
         close(clientfd);
+        char errText[512] = {0};
+        sprintf(errText, "send error, errno: %d", errno);
+        controller->SetFailed(errText);
         return;
     }
 
@@ -98,16 +112,20 @@ void MprpChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
     char recv_buf[1024] = {};
     int recv_size = 0;
     if ((recv_size = recv(clientfd, recv_buf, 1024, 0)) == -1) {
-        std::cout << "recv error, errno: " << errno << std::endl;
+        // std::cout << "recv error, errno: " << errno << std::endl;
         close(clientfd);
+        char errText[512] = {0};
+        sprintf(errText, "recv error, errno: %d", errno);
+        controller->SetFailed(errText);
         return;
     }
 
     // 反序列化rpc调用的响应数据
     std::string response_str(recv_buf, recv_size); // 精确拷贝 recv_size 个字节，不会被 \0 截断
     if (!response->ParseFromString(response_str)) {
-        std::cout << "response error, reponse_str: " << response_str << std::endl;
+        // std::cout << "response error, reponse_str: " << response_str << std::endl;
         close(clientfd);
+        controller->SetFailed("response error, reponse_str: " + response_str);
         return;
     }
 
