@@ -1,5 +1,7 @@
 #include "mprpcprovider.h"
 #include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <google/protobuf/arena.h>
 #include <google/protobuf/descriptor.h>
 #include <google/protobuf/service.h>
@@ -10,8 +12,10 @@
 #include <string>
 #include "mprpcapplication.h"
 #include <functional>
+#include <zookeeper/zookeeper.h>
 #include "mprpcheader.pb.h"
 #include "logger.h"
+#include "zookeeperutil.h"
 
 // 这里是框架提供给外部使用的，可以发布rpc方法的函数接口
 void MprpcProvider::NotifyService(::google::protobuf::Service *service) {
@@ -56,6 +60,25 @@ void MprpcProvider::Run() {
 
     // 设置muduo库的线程数量
     server.setThreadNum(4);
+
+    // 把当前rpc节点上要发布的服务全部注册到zk上面，让rpc client可以从zk上发现服务
+    ZkClient zkCli;
+    zkCli.Start();
+    // service_name为永久性节点    method_name为临时性节点
+    for (auto& sp : m_serviceMap) {
+        // /service_name   /UserServiceRpc
+        std::string service_path = "/" + sp.first;
+        zkCli.Create(service_path.c_str(), nullptr, 0);
+
+        for (auto& mp : sp.second.m_methodMap) {
+            // /service_name/method_name   /UserServiceRpc/Login 存储当前这个rpc服务节点主机的ip和port
+            std::string method_path = service_path + "/" + mp.first;
+            char method_path_data[128] = {0};
+            sprintf(method_path_data, "%s:%d", ip.c_str(), port);
+            // ZOO_EPHEMERAL表示znode是一个临时性节点
+            zkCli.Create(method_path.c_str(), method_path_data, strlen(method_path_data), ZOO_EPHEMERAL);
+        }
+    }
 
     // rpc服务节点启动时，打印日志信息
     std::cout << "RpcProvider start service at ip:" << ip << " port:" << port << std::endl;
