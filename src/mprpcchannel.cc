@@ -1,5 +1,5 @@
 #include "mprpcchannel.h"
-#include "rpcheader.pb.h"
+#include "mprpcheader.pb.h"
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -36,7 +36,7 @@ void MprpChannel::CallMethod(const google::protobuf::MethodDescriptor* method,
     }
 
     // 定义rpc的请求header
-    mprpc::RpcHeader rpcheader;
+    mprpc::MprpcHeader rpcheader;
     rpcheader.set_service_name(service_name);
     rpcheader.set_method_name(method_name);
     rpcheader.set_args_size(args_size);
